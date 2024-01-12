@@ -13,6 +13,8 @@ from reportlab.lib.units import inch
 from datetime import datetime
 import pandas as pd
 import os
+from tkinter import simpledialog
+
 
 configuracion_restaurante = {"nombre": "Mi Restaurante", "datos_facturacion": "Datos de Facturación"}
 informacion_comanda = {"numero_mesa": "", "nombre_mesero": "", "comentarios": ""}
@@ -197,7 +199,7 @@ def generar_comanda_pdf(platillos, nombre_archivo, configuracion, informacion):
 
     # Listado de platillos
     for platillo in platillos:
-        c.drawString(10, y_actual, f"{platillo['nombre']} - ${platillo['precio']}")
+        c.drawString(10, y_actual, f"{platillo['cantidad']}x {platillo['nombre']} - ${platillo['precio']}")
         y_actual -= 15
 
     # Comentarios
@@ -227,7 +229,9 @@ def recopilar_platillos_para_comanda(lista_platillos):
         id_platillo = lista_platillos.get(indice).split(' - ')[0]
         cursor.execute("SELECT nombre, precio FROM platillos WHERE id = ?", (id_platillo,))
         platillo = cursor.fetchone()
-        platillos_seleccionados.append({'nombre': platillo[0], 'precio': platillo[1]})
+        cantidad = simpledialog.askinteger("Cantidad", f"Introduce la cantidad para {platillo[0]}", minvalue=1, maxvalue=100)
+        if cantidad:
+            platillos_seleccionados.append({'nombre': platillo[0], 'precio': platillo[1], 'cantidad': cantidad})
     conexion.close()
     return platillos_seleccionados
 
@@ -241,14 +245,14 @@ def guardar_comanda_en_excel(informacion_comanda, platillos_seleccionados, ruta_
     fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     for platillo in platillos_seleccionados:
-        total = platillo['precio']
+        total = platillo['precio'] * platillo['cantidad']
         nueva_fila = pd.DataFrame([{
             "Número Comanda": numero_comanda,
             "Fecha": fecha,
             "Mesero": informacion_comanda["nombre_mesero"],
             "Mesa": informacion_comanda["numero_mesa"],
             "Platillo": platillo["nombre"],
-            "Cantidad": 1,
+            "Cantidad": platillo['cantidad'],
             "Precio Unitario": platillo["precio"],
             "Total": total
         }])
@@ -265,9 +269,10 @@ def main():
     lista_platillos.pack()
     actualizar_lista_platillos(lista_platillos)
     def generar_comanda_y_guardar(informacion_comanda, lista_platillos, nombre_archivo_pdf="comanda.pdf", nombre_archivo_excel="ventas.xlsx"):
-       platillos_seleccionados = recopilar_platillos_para_comanda(lista_platillos)
-       generar_comanda_pdf(platillos_seleccionados, nombre_archivo_pdf, configuracion_restaurante, informacion_comanda)
-       guardar_comanda_en_excel(informacion_comanda, platillos_seleccionados, nombre_archivo_excel)
+        platillos_seleccionados = recopilar_platillos_para_comanda(lista_platillos)
+        if platillos_seleccionados:
+            generar_comanda_pdf(platillos_seleccionados, nombre_archivo_pdf, configuracion_restaurante, informacion_comanda)
+            guardar_comanda_en_excel(informacion_comanda, platillos_seleccionados, nombre_archivo_excel)
 
     tk.Button(ventana, text="Generar Comanda y Guardar en Excel", command=lambda: generar_comanda_y_guardar(informacion_comanda, lista_platillos)).pack()
     tk.Button(ventana, text="Añadir Platillo", command=agregar_platillo_interfaz).pack()
